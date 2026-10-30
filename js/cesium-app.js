@@ -9,6 +9,7 @@ const streetGroups=window.ROMA_ROAD_INDEX||[];
 const groupBySegment=new Map(streetGroups.flatMap(g=>g.segments.map(id=>[id,g])));
 let roadHighlight=[];
 let healthPoints=null,healthLabels=null;const healthEntries=[];
+let municipiPoints=null,municipiLabels=null;const municipiEntries=[];
 // Optional map overlays are independent of the exercise mode.
 const overlayState={roads:false,metro:false,metroStations:false,railStations:false,municipi:false,places:false,parks:false,health:false};
 document.querySelector('[data-mode="testMovimenti"]')?.remove();
@@ -26,7 +27,7 @@ const roadsCheckbox=addOverlayOption('roads','Strade principali',true);
 addOverlayOption('metro','Tracciati Metro A, B/B1, C',true);
 addOverlayOption('metroStations','Stazioni Metro',true);
 addOverlayOption('railStations','Stazioni ferroviarie',true);
-addOverlayOption('municipi','Sedi dei municipi',false);
+addOverlayOption('municipi','Sedi dei municipi',true);
 addOverlayOption('places','Luoghi da visitare',false);
 addOverlayOption('health','Ospedali, cliniche e centri di cura',true);
 addOverlayOption('parks','Parchi e giardini',false);
@@ -117,7 +118,7 @@ areaPicker.onchange=()=>{if(!areaPicker.value||!started)return;const id=Number(a
 function change(next){mode=next;areaPicker.value='';document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('title').textContent=modes[mode][0];$('instructions').textContent=modes[mode][1];$('legend').textContent='Verde salvia: quartieri e rioni · Lilla: aree funzionali · Giallo: selezione · Azzurro: Tevere';newQuestion();}
 function refresh(){const study=mode.startsWith('learn'),h=height();for(const [id,items] of entities){let color=eligible(id)?(districts[id].type==='zona funzionale'?colors.functional:colors.base):colors.inactive;if(mode==='testNomi'&&!done&&id===target||mode==='testMovimenti'&&(id===start||id===end)||study&&id===selected)color=colors.yellow;if(done&&id===target&&mode!=='testMovimenti')color=colors.green;if(id===wrong)color=colors.red;for(const e of items)e.polygon.material=C.Color.fromCssColorString(color).withAlpha(eligible(id)?.78:.43);}
 refreshDistrictLabels(study,h);
-const showRoads=overlayState.roads;if(roadPrimitives)roadPrimitives.show=showRoads;if(!showRoads&&!popupBox.hidden&&roadHighlight.length)hidePopup();refreshRoadLabels(showRoads,h);refreshTransit(h);refreshHealth(h);
+const showRoads=overlayState.roads;if(roadPrimitives)roadPrimitives.show=showRoads;if(!showRoads&&!popupBox.hidden&&roadHighlight.length)hidePopup();refreshRoadLabels(showRoads,h);refreshTransit(h);refreshHealth(h);refreshMunicipi(h);
 for(const entity of routeEntities)viewer.entities.remove(entity);routeEntities=[];
 if(mode==='testMovimenti'&&chosenRoads.length){const routeColor=C.Color.fromCssColorString(done&&lastMoveCorrect?'#1ca46b':'#ee8b32');for(const link of chosenRoads){const segment=roadById.get(link.segment);if(!segment)continue;for(const coords of segment.coords){if(coords.length<2)continue;routeEntities.push(viewer.entities.add({polyline:{positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:7,material:routeColor}}));}}}viewer.scene.requestRender();}
 function wrapDistrictName(name){const words=name.trim().split(/\s+/);if(words.length<2)return name;let lines=[''];for(const word of words){const current=lines.at(-1);if(current&&(current.length+word.length+1>16)&&lines.length<3)lines.push(word);else lines[lines.length-1]=current?`${current} ${word}`:word;}return lines.join('\n');}
@@ -196,7 +197,7 @@ function makeHealth(){
   for(const item of facilities){
     const position=C.Cartesian3.fromDegrees(...item.coords),hospital=item.kind==='ospedale';
     healthPoints.add({position,pixelSize:hospital?12:10,color:C.Color.fromCssColorString(hospital?'#da3951':'#8a47ad'),outlineColor:C.Color.WHITE,outlineWidth:2,id:{romaHealthId:item.id},disableDepthTestDistance:Number.POSITIVE_INFINITY});
-    const label=healthLabels.add({position,text:item.name,font:'600 11px Segoe UI, Arial',fillColor:C.Color.fromCssColorString('#552d51'),outlineColor:C.Color.WHITE,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,pixelOffset:new C.Cartesian2(0,-17),disableDepthTestDistance:Number.POSITIVE_INFINITY,show:false});
+    const label=healthLabels.add({position,text:item.kind==='sede secondaria'?item.role:item.name,font:'600 11px Segoe UI, Arial',fillColor:C.Color.fromCssColorString('#552d51'),outlineColor:C.Color.WHITE,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,pixelOffset:new C.Cartesian2(0,-17),disableDepthTestDistance:Number.POSITIVE_INFINITY,show:false});
     healthEntries.push({item,label});
   }
   refreshHealth(height());
@@ -225,16 +226,64 @@ function showHealthPopup(item){
   top.append(title,close);popupBox.append(top);
   const type=document.createElement('div');type.className='popupType';type.textContent=item.kind==='ospedale'?'OSPEDALE':'CLINICA / CENTRO DI CURA';popupBox.append(type);
   const description=document.createElement('p');description.textContent=item.description;popupBox.append(description);
-  const note=document.createElement('p');note.className='roadPopupNote';note.textContent='Posizione cartografica indicativa; verificare indirizzo e servizi sul sito della struttura.';popupBox.append(note);
+  if(item.officialName&&item.officialName!==item.name)addLine(popupBox,'Denominazione ufficiale',item.officialName);
+  if(item.aliases?.length)addLine(popupBox,'Altri nomi',item.aliases.join(' · '));
+  if(item.address)addLine(popupBox,'Indirizzo',item.address);
   if(item.website){const link=document.createElement('a');link.href=item.website;link.target='_blank';link.rel='noopener noreferrer';link.className='healthWebsite';link.textContent='Apri sito ufficiale ↗';popupBox.append(link);}
+  const mapsLink=document.createElement('a');mapsLink.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(item.name+' '+(item.address||'Roma'));mapsLink.target='_blank';mapsLink.rel='noopener noreferrer';mapsLink.className='healthWebsite';mapsLink.textContent='Apri su Google Maps ↗';popupBox.append(mapsLink);
   positionPopup();viewer.scene.requestRender();
 }
+
+function makeMunicipi(){
+  municipiPoints=viewer.scene.primitives.add(new C.PointPrimitiveCollection());
+  municipiLabels=viewer.scene.primitives.add(new C.LabelCollection());
+  for(const item of (window.ROMA_MUNICIPI||[])){
+    const position=C.Cartesian3.fromDegrees(...item.coords);
+    municipiPoints.add({position,pixelSize:item.kind==='sede secondaria'?9:13,color:C.Color.fromCssColorString(item.kind==='sede secondaria'?'#63a4cc':'#1975ab'),outlineColor:C.Color.WHITE,outlineWidth:2,id:{romaMunicipioId:item.id},disableDepthTestDistance:Number.POSITIVE_INFINITY});
+    const label=municipiLabels.add({position,text:item.kind==='sede secondaria'?item.role:item.name,font:'600 11px Segoe UI, Arial',fillColor:C.Color.fromCssColorString('#154d72'),outlineColor:C.Color.WHITE,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,pixelOffset:new C.Cartesian2(0,-17),disableDepthTestDistance:Number.POSITIVE_INFINITY,show:false});
+    municipiEntries.push({item,label});
+  }
+  refreshMunicipi(height());
+}
+function refreshMunicipi(h){
+  if(!municipiPoints)return;
+  municipiPoints.show=overlayState.municipi;
+  municipiLabels.show=overlayState.municipi;
+  let count=0;const occupied=[];
+  for(const {item,label} of municipiEntries){
+    label.show=false;
+    if(!overlayState.municipi||h>45000)continue;
+    const p=C.SceneTransforms.worldToWindowCoordinates(viewer.scene,label.position);
+    if(!p||p.x<0||p.y<0||p.x>viewer.canvas.clientWidth||p.y>viewer.canvas.clientHeight)continue;
+    const box={left:p.x-65,right:p.x+65,top:p.y-32,bottom:p.y-11};
+    if(occupied.some(o=>box.left<o.right&&box.right>o.left&&box.top<o.bottom&&box.bottom>o.top))continue;
+    label.show=true;occupied.push(box);count++;
+  }
+}
+function showMunicipioPopup(item){
+  hidePopup();popupCoords=item.coords;popupBox.hidden=false;
+  const top=document.createElement('div');top.className='popupHead';
+  const title=document.createElement('h3');title.textContent=item.name;
+  const close=document.createElement('button');close.type='button';close.className='popupClose';close.textContent='×';close.setAttribute('aria-label','Chiudi informazioni');close.onclick=hidePopup;
+  top.append(title,close);popupBox.append(top);
+  const type=document.createElement('div');type.className='popupType';type.textContent=item.kind==='sede secondaria'?'SEDE DISTACCATA / UFFICIO':'SEDE PRINCIPALE';popupBox.append(type);
+  const description=document.createElement('p');description.textContent=item.description;popupBox.append(description);
+  addLine(popupBox,'Municipio','Roma '+item.municipio);
+  addLine(popupBox,'Funzione',item.role);
+  addLine(popupBox,'Indirizzo',item.address);
+  const related=(window.ROMA_MUNICIPI||[]).filter(x=>x.municipio===item.municipio&&x.id!==item.id);
+  if(related.length){const h=document.createElement('div');h.className='popupType';h.textContent='ALTRE SEDI DEL MUNICIPIO';popupBox.append(h);for(const office of related){const b=document.createElement('button');b.type='button';b.className='healthWebsite';b.textContent=office.role+' — '+office.address;b.addEventListener('click',()=>{showMunicipioPopup(office);viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(office.coords[0],office.coords[1],7000),duration:0.7});});popupBox.append(b);}}
+  const official=document.createElement('a');official.href=item.website;official.target='_blank';official.rel='noopener noreferrer';official.className='healthWebsite';official.textContent='Roma Capitale — Sito ufficiale ↗';popupBox.append(official);
+  const maps=document.createElement('a');maps.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(item.name+' '+item.address);maps.target='_blank';maps.rel='noopener noreferrer';maps.className='healthWebsite';maps.textContent='Apri su Google Maps ↗';popupBox.append(maps);
+  positionPopup();viewer.scene.requestRender();
+}
+
 function makeRoads(){roadPrimitives=viewer.scene.primitives.add(new C.PolylineCollection());const lc=viewer.scene.primitives.add(new C.LabelCollection()),names=new Set();let count=0;
 for(const s of roads.segments){if(s.priority>3)continue;const color=C.Color.fromCssColorString(s.priority<=1?'#ab6e35':s.priority<=3?'#c08b57':'#dbb98a').withAlpha(.78);for(const coords of s.coords){if(coords.length<2)continue;roadPrimitives.add({positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:s.priority<=2?2.6:1.4,material:C.Material.fromType('Color',{color}),id:{romaRoadSegment:s.id}});count++;}
 if(s.name&&s.priority<=3&&!names.has(s.name)&&names.size<450&&s.coords[0]?.length>1){const line=s.coords[0],mid=line[Math.floor(line.length/2)];const label=lc.add({position:C.Cartesian3.fromDegrees(...mid),text:s.name,font:'600 11px Segoe UI, Arial',fillColor:C.Color.fromCssColorString('#915e32'),outlineColor:C.Color.WHITE,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,disableDepthTestDistance:Number.POSITIVE_INFINITY,show:false});roadLabels.push({label,priority:s.priority});names.add(s.name);}}
 $('mapStatus').textContent=`${districts.length} territori nei quiz · ${count.toLocaleString('it')} tratti OSM · ${roads.links.length} collegamenti`;}
 function river(){const coords=[[12.507,42.065],[12.500,42.043],[12.500,42.020],[12.503,41.998],[12.500,41.981],[12.491,41.966],[12.482,41.953],[12.478,41.944],[12.471,41.938],[12.463,41.933],[12.461,41.925],[12.470,41.920],[12.474,41.911],[12.467,41.904],[12.468,41.895],[12.479,41.889],[12.482,41.879],[12.478,41.870],[12.472,41.861],[12.467,41.849],[12.463,41.839],[12.455,41.828],[12.451,41.815],[12.438,41.801],[12.421,41.790],[12.410,41.780],[12.385,41.776],[12.369,41.764],[12.348,41.754],[12.326,41.742],[12.304,41.732],[12.281,41.724],[12.257,41.722]];viewer.entities.add({name:'Tevere (tracciato indicativo)',polyline:{positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:7,material:C.Color.fromCssColorString('#4eb7e5').withAlpha(.55)}});}
-async function init(){try{const ds=await C.GeoJsonDataSource.load('js/districts.geojson',{stroke:C.Color.WHITE,fill:C.Color.fromCssColorString(colors.base),strokeWidth:1});viewer.dataSources.add(ds);for(const e of ds.entities.values){const id=e.properties?.roma_id?.getValue(C.JulianDate.now());if(Number.isInteger(id)&&e.polygon){if(!entities.has(id))entities.set(id,[]);entities.get(id).push(e);const hierarchy=e.polygon.hierarchy.getValue(C.JulianDate.now()),rect=C.Rectangle.fromCartesianArray(hierarchy.positions),center=C.Rectangle.center(rect);if(!districts[id].geoCenter)districts[id].geoCenter=[C.Math.toDegrees(center.longitude),C.Math.toDegrees(center.latitude)];}}if(entities.size!==districts.length)throw Error(`Geometrie: ${entities.size} di ${districts.length}`);recenterDistricts();makeLabels();makeRoads();makeTransit();makeHealth();river();started=true;change('learnQuartieri');fly(views.city);
+async function init(){try{const ds=await C.GeoJsonDataSource.load('js/districts.geojson',{stroke:C.Color.WHITE,fill:C.Color.fromCssColorString(colors.base),strokeWidth:1});viewer.dataSources.add(ds);for(const e of ds.entities.values){const id=e.properties?.roma_id?.getValue(C.JulianDate.now());if(Number.isInteger(id)&&e.polygon){if(!entities.has(id))entities.set(id,[]);entities.get(id).push(e);const hierarchy=e.polygon.hierarchy.getValue(C.JulianDate.now()),rect=C.Rectangle.fromCartesianArray(hierarchy.positions),center=C.Rectangle.center(rect);if(!districts[id].geoCenter)districts[id].geoCenter=[C.Math.toDegrees(center.longitude),C.Math.toDegrees(center.latitude)];}}if(entities.size!==districts.length)throw Error(`Geometrie: ${entities.size} di ${districts.length}`);recenterDistricts();makeLabels();makeRoads();makeTransit();makeHealth();makeMunicipi();river();started=true;change('learnQuartieri');fly(views.city);
 // In SCENE2D the filled district polygon often wins scene.pick over a thin road.
 // Search all picked primitives first, then use a screen-space tolerance for roads.
 const roadHitSegments=roads.segments.filter(s=>s.priority<=3&&groupBySegment.has(s.id));
@@ -274,6 +323,8 @@ const handler=new C.ScreenSpaceEventHandler(viewer.scene.canvas);
 handler.setInputAction(ev=>{
   const pickedAll=viewer.scene.drillPick(ev.position,25);
   const picked=pickedAll[0]||viewer.scene.pick(ev.position);
+  const municipioHit=overlayState.municipi&&pickedAll.find(x=>x?.id?.romaMunicipioId);
+  if(municipioHit){const office=(window.ROMA_MUNICIPI||[]).find(x=>x.id===municipioHit.id.romaMunicipioId);if(office){showMunicipioPopup(office);return;}}
   const healthHit=overlayState.health&&pickedAll.find(x=>x?.id?.romaHealthId);
   if(healthHit){const facility=(window.ROMA_HEALTH||[]).find(x=>x.id===healthHit.id.romaHealthId);if(facility){showHealthPopup(facility);return;}}
   const station=pickedAll.find(x=>x?.id?.romaTransitStation);
