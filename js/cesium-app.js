@@ -194,7 +194,57 @@ if(s.name&&s.priority<=3&&!names.has(s.name)&&names.size<450&&s.coords[0]?.lengt
 $('mapStatus').textContent=`${districts.length} territori nei quiz · ${count.toLocaleString('it')} tratti OSM · ${roads.links.length} collegamenti`;}
 function river(){const coords=[[12.507,42.065],[12.500,42.043],[12.500,42.020],[12.503,41.998],[12.500,41.981],[12.491,41.966],[12.482,41.953],[12.478,41.944],[12.471,41.938],[12.463,41.933],[12.461,41.925],[12.470,41.920],[12.474,41.911],[12.467,41.904],[12.468,41.895],[12.479,41.889],[12.482,41.879],[12.478,41.870],[12.472,41.861],[12.467,41.849],[12.463,41.839],[12.455,41.828],[12.451,41.815],[12.438,41.801],[12.421,41.790],[12.410,41.780],[12.385,41.776],[12.369,41.764],[12.348,41.754],[12.326,41.742],[12.304,41.732],[12.281,41.724],[12.257,41.722]];viewer.entities.add({name:'Tevere (tracciato indicativo)',polyline:{positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:7,material:C.Color.fromCssColorString('#4eb7e5').withAlpha(.55)}});}
 async function init(){try{const ds=await C.GeoJsonDataSource.load('js/districts.geojson',{stroke:C.Color.WHITE,fill:C.Color.fromCssColorString(colors.base),strokeWidth:1});viewer.dataSources.add(ds);for(const e of ds.entities.values){const id=e.properties?.roma_id?.getValue(C.JulianDate.now());if(Number.isInteger(id)&&e.polygon){if(!entities.has(id))entities.set(id,[]);entities.get(id).push(e);const hierarchy=e.polygon.hierarchy.getValue(C.JulianDate.now()),rect=C.Rectangle.fromCartesianArray(hierarchy.positions),center=C.Rectangle.center(rect);if(!districts[id].geoCenter)districts[id].geoCenter=[C.Math.toDegrees(center.longitude),C.Math.toDegrees(center.latitude)];}}if(entities.size!==districts.length)throw Error(`Geometrie: ${entities.size} di ${districts.length}`);recenterDistricts();makeLabels();makeRoads();makeTransit();river();started=true;change('learnQuartieri');fly(views.city);
-const handler=new C.ScreenSpaceEventHandler(viewer.scene.canvas);handler.setInputAction(ev=>{const picked=viewer.scene.pick(ev.position);if(picked?.id?.romaTransitStation){showTransitPopup(picked.id.romaTransitStation);return;}if(overlayState.roads&&Number.isInteger(picked?.id?.romaRoadSegment)){const group=groupBySegment.get(picked.id.romaRoadSegment);if(group){const cart=viewer.camera.pickEllipsoid(ev.position);const p=cart?C.Cartographic.fromCartesian(cart):null;const seg=roadById.get(picked.id.romaRoadSegment);const location=p?[C.Math.toDegrees(p.longitude),C.Math.toDegrees(p.latitude)]:seg?.coords[0]?.[0];if(location)showRoadPopup(group,location);return;}}const id=picked?.id?.properties?.roma_id?.getValue(C.JulianDate.now());if(Number.isInteger(id))clicked(id);else if(mode.startsWith('learn'))hidePopup();},C.ScreenSpaceEventType.LEFT_CLICK);
+// In SCENE2D the filled district polygon often wins scene.pick over a thin road.
+// Search all picked primitives first, then use a screen-space tolerance for roads.
+const roadHitSegments=roads.segments.filter(s=>s.priority<=3&&groupBySegment.has(s.id));
+function nearestRoadAt(screenPoint){
+  const cart=viewer.camera.pickEllipsoid(screenPoint);
+  if(!cart)return null;
+  const geo=C.Cartographic.fromCartesian(cart),lon=C.Math.toDegrees(geo.longitude),lat=C.Math.toDegrees(geo.latitude);
+  const cameraWidth=Math.max(0.001,viewer.camera.computeViewRectangle()?.east-viewer.camera.computeViewRectangle()?.west||0.1);
+  const delta=Math.max(.00012,Math.min(.05,C.Math.toDegrees(cameraWidth)*14/Math.max(1,viewer.canvas.clientWidth)));
+  let best=null,bestDist2=14*14;
+  const distPointSegment=(x,y,x1,y1,x2,y2)=>{const dx=x2-x1,dy=y2-y1,den=dx*dx+dy*dy;const t=den?Math.max(0,Math.min(1,((x-x1)*dx+(y-y1)*dy)/den)):0;return (x-x1-t*dx)**2+(y-y1-t*dy)**2;};
+  for(const seg of roadHitSegments){
+    for(const line of seg.coords){
+      for(let i=1;i<line.length;i++){
+        const a=line[i-1],b=line[i];
+        if(lon<Math.min(a[0],b[0])-delta||lon>Math.max(a[0],b[0])+delta||lat<Math.min(a[1],b[1])-delta||lat>Math.max(a[1],b[1])+delta)continue;
+        const p1=C.SceneTransforms.worldToWindowCoordinates(viewer.scene,C.Cartesian3.fromDegrees(a[0],a[1]));
+        const p2=C.SceneTransforms.worldToWindowCoordinates(viewer.scene,C.Cartesian3.fromDegrees(b[0],b[1]));
+        if(!p1||!p2)continue;
+        const d2=distPointSegment(screenPoint.x,screenPoint.y,p1.x,p1.y,p2.x,p2.y);
+        if(d2<bestDist2){bestDist2=d2;best=seg.id;}
+      }
+    }
+  }
+  return best;
+}
+function roadPopupAt(segmentId,mouse){
+  const group=groupBySegment.get(segmentId);
+  if(!group)return false;
+  const cart=viewer.camera.pickEllipsoid(mouse),p=cart?C.Cartographic.fromCartesian(cart):null;
+  const seg=roadById.get(segmentId);
+  const location=p?[C.Math.toDegrees(p.longitude),C.Math.toDegrees(p.latitude)]:seg?.coords[0]?.[0];
+  if(!location)return false;
+  showRoadPopup(group,location);return true;
+}
+const handler=new C.ScreenSpaceEventHandler(viewer.scene.canvas);
+handler.setInputAction(ev=>{
+  const pickedAll=viewer.scene.drillPick(ev.position,25);
+  const picked=pickedAll[0]||viewer.scene.pick(ev.position);
+  const station=pickedAll.find(x=>x?.id?.romaTransitStation);
+  if(station){showTransitPopup(station.id.romaTransitStation);return;}
+  if(overlayState.roads){
+    const roadHit=pickedAll.find(x=>Number.isInteger(x?.id?.romaRoadSegment));
+    const id=roadHit?.id?.romaRoadSegment??nearestRoadAt(ev.position);
+    if(Number.isInteger(id)&&roadPopupAt(id,ev.position))return;
+  }
+  const area=pickedAll.find(x=>x?.id?.properties?.roma_id);
+  const id=(area||picked)?.id?.properties?.roma_id?.getValue(C.JulianDate.now());
+  if(Number.isInteger(id))clicked(id);
+  else if(mode.startsWith('learn'))hidePopup();
+},C.ScreenSpaceEventType.LEFT_CLICK);
 viewer.camera.moveEnd.addEventListener(()=>{const p=viewer.camera.pickEllipsoid(new C.Cartesian2(viewer.canvas.clientWidth/2,viewer.canvas.clientHeight/2));if(p&&!C.Rectangle.contains(region,C.Cartographic.fromCartesian(p))){fly(views.all);feedback('Navigazione limitata al Lazio.');}refresh();});
 }catch(err){console.error('Roma Lab - inizializzazione Cesium:',err);$('mapStatus').textContent=`Errore mappa: ${err.message}`;feedback('Impossibile caricare la mappa. Controlla Console e Network (F12).',false);}}
 document.querySelector('.updateNotice p').textContent='Disponibili 332 quartieri urbani, 22 rioni e 100 zone funzionali, tutti selezionabili nei test del livello massimo. La delibera del 1° ottobre 2026 approva 334 quartieri: il servizio ufficiale deve ancora pubblicarne due.';

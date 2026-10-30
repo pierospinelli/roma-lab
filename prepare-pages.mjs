@@ -10,4 +10,4 @@ for(const item of assets){await mkdir(dirname(join(dest,item)),{recursive:true})
 await writeFile(join(dest,'.nojekyll'),'');
 const required=['index.html','js/cesium-app.js','js/districts.geojson','vendor/cesium/Cesium.js','vendor/cesium/Workers','vendor/cesium/Assets','vendor/cesium/ThirdParty','vendor/cesium/Widgets/widgets.css'];
 for(const file of required){const st=await stat(join(dest,file));if(!st.size&&!st.isDirectory())throw Error('Risorsa vuota: '+file);}
-console.log('Roma Lab v0.18 pronta in public/');
+console.log('Roma Lab v0.18.1 pronta in public/');
