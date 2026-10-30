@@ -366,10 +366,10 @@ function showInterestPopup(item,monument){
   hidePopup();popupCoords=item.coords;popupBox.hidden=false;
   const top=document.createElement('div');top.className='popupHead';const title=document.createElement('h3');title.textContent=item.name;
   const close=document.createElement('button');close.className='popupClose';close.textContent='×';close.onclick=hidePopup;top.append(title,close);popupBox.append(top);
-  if(monument){const img=document.createElement('img');img.src=item.image;img.alt='Illustrazione del monumento: '+item.name;img.className='monumentPopupImage';popupBox.append(img);}
+  if(monument){const img=document.createElement('img');img.src=item.image;img.alt=(item.photoCredit?'Fotografia di ':'Illustrazione di ')+item.name;img.className='monumentPopupImage';popupBox.append(img);}
   const type=document.createElement('div');type.className='popupType';type.textContent=monument?'MONUMENTO':item.kind.toLocaleUpperCase('it');popupBox.append(type);
   const desc=document.createElement('p');desc.textContent=item.description;popupBox.append(desc);
-  if(monument){const source=document.createElement('p');source.className='monumentCredit';source.textContent='Miniatura illustrativa originale, non fotografia.';popupBox.append(source);}
+  if(monument){const source=document.createElement('p');source.className='monumentCredit';source.textContent=item.photoCredit?'Foto: '+item.photoCredit+' · '+item.photoLicense:'Miniatura illustrativa originale, non fotografia.';if(item.photoSource){const a=document.createElement('a');a.href=item.photoSource;a.target='_blank';a.rel='noopener noreferrer';a.textContent=' · Fonte e licenza ↗';source.append(a);}popupBox.append(source);}
   const maps=document.createElement('a');maps.className='healthWebsite';maps.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(item.mapsQuery);maps.target='_blank';maps.rel='noopener noreferrer';maps.textContent='Apri su Google Maps ↗';popupBox.append(maps);
   positionPopup();viewer.scene.requestRender();
 }
