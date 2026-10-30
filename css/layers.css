@@ -20,3 +20,6 @@
 .roadDistrictList button{background:#edf4f7;color:#23516a;border:1px solid #c4d9e4;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px}
 .roadDistrictList button:hover{background:#d7e9f1}
 .roadPopupNote{font-size:11px;color:#667f8b;line-height:1.4;margin-top:12px}
+
+.areaPopup .healthWebsite{display:inline-flex;align-items:center;margin-top:10px;padding:9px 12px;border-radius:7px;background:#265d7b;color:#fff;text-decoration:none;font-weight:700;font-size:13px;}
+.areaPopup .healthWebsite:hover{background:#17425c;}

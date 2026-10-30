@@ -8,6 +8,7 @@ const roadById=new Map(roads.segments.map(s=>[s.id,s]));
 const streetGroups=window.ROMA_ROAD_INDEX||[];
 const groupBySegment=new Map(streetGroups.flatMap(g=>g.segments.map(id=>[id,g])));
 let roadHighlight=[];
+let healthPoints=null,healthLabels=null;const healthEntries=[];
 // Optional map overlays are independent of the exercise mode.
 const overlayState={roads:false,metro:false,metroStations:false,railStations:false,municipi:false,places:false,parks:false,health:false};
 document.querySelector('[data-mode="testMovimenti"]')?.remove();
@@ -27,7 +28,7 @@ addOverlayOption('metroStations','Stazioni Metro',true);
 addOverlayOption('railStations','Stazioni ferroviarie',true);
 addOverlayOption('municipi','Sedi dei municipi',false);
 addOverlayOption('places','Luoghi da visitare',false);
-addOverlayOption('health','Ospedali e cliniche',false);
+addOverlayOption('health','Ospedali, cliniche e centri di cura',true);
 addOverlayOption('parks','Parchi e giardini',false);
 layerToggle.onclick=()=>{layerPanel.hidden=!layerPanel.hidden;layerToggle.setAttribute('aria-expanded',String(!layerPanel.hidden));};
 const mapPanel=document.querySelector('.mapPanel');mapPanel.style.position='relative';mapPanel.append(mapHeaderControls,layerPanel);
@@ -116,7 +117,7 @@ areaPicker.onchange=()=>{if(!areaPicker.value||!started)return;const id=Number(a
 function change(next){mode=next;areaPicker.value='';document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$('title').textContent=modes[mode][0];$('instructions').textContent=modes[mode][1];$('legend').textContent='Verde salvia: quartieri e rioni · Lilla: aree funzionali · Giallo: selezione · Azzurro: Tevere';newQuestion();}
 function refresh(){const study=mode.startsWith('learn'),h=height();for(const [id,items] of entities){let color=eligible(id)?(districts[id].type==='zona funzionale'?colors.functional:colors.base):colors.inactive;if(mode==='testNomi'&&!done&&id===target||mode==='testMovimenti'&&(id===start||id===end)||study&&id===selected)color=colors.yellow;if(done&&id===target&&mode!=='testMovimenti')color=colors.green;if(id===wrong)color=colors.red;for(const e of items)e.polygon.material=C.Color.fromCssColorString(color).withAlpha(eligible(id)?.78:.43);}
 refreshDistrictLabels(study,h);
-const showRoads=overlayState.roads;if(roadPrimitives)roadPrimitives.show=showRoads;if(!showRoads&&!popupBox.hidden&&roadHighlight.length)hidePopup();refreshRoadLabels(showRoads,h);refreshTransit(h);
+const showRoads=overlayState.roads;if(roadPrimitives)roadPrimitives.show=showRoads;if(!showRoads&&!popupBox.hidden&&roadHighlight.length)hidePopup();refreshRoadLabels(showRoads,h);refreshTransit(h);refreshHealth(h);
 for(const entity of routeEntities)viewer.entities.remove(entity);routeEntities=[];
 if(mode==='testMovimenti'&&chosenRoads.length){const routeColor=C.Color.fromCssColorString(done&&lastMoveCorrect?'#1ca46b':'#ee8b32');for(const link of chosenRoads){const segment=roadById.get(link.segment);if(!segment)continue;for(const coords of segment.coords){if(coords.length<2)continue;routeEntities.push(viewer.entities.add({polyline:{positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:7,material:routeColor}}));}}}viewer.scene.requestRender();}
 function wrapDistrictName(name){const words=name.trim().split(/\s+/);if(words.length<2)return name;let lines=[''];for(const word of words){const current=lines.at(-1);if(current&&(current.length+word.length+1>16)&&lines.length<3)lines.push(word);else lines[lines.length-1]=current?`${current} ${word}`:word;}return lines.join('\n');}
@@ -188,12 +189,52 @@ function refreshTransit(h){
   }
 }
 function showTransitPopup(station){hidePopup();popupCoords=station.coords;popupBox.hidden=false;const top=document.createElement('div');top.className='popupHead';const title=document.createElement('h3');title.textContent=station.name;const close=document.createElement('button');close.className='popupClose';close.textContent='×';close.setAttribute('aria-label','Chiudi informazioni');close.onclick=hidePopup;top.append(title,close);popupBox.append(top);addLine(popupBox,'Categoria',station.kind==='metro'?'Stazione Metro':'Stazione ferroviaria');if(station.line)addLine(popupBox,'Linea',station.line);addLine(popupBox,'Fonte','OpenStreetMap');positionPopup();}
+function makeHealth(){
+  const facilities=window.ROMA_HEALTH||[];
+  healthPoints=viewer.scene.primitives.add(new C.PointPrimitiveCollection());
+  healthLabels=viewer.scene.primitives.add(new C.LabelCollection());
+  for(const item of facilities){
+    const position=C.Cartesian3.fromDegrees(...item.coords),hospital=item.kind==='ospedale';
+    healthPoints.add({position,pixelSize:hospital?12:10,color:C.Color.fromCssColorString(hospital?'#da3951':'#8a47ad'),outlineColor:C.Color.WHITE,outlineWidth:2,id:{romaHealthId:item.id},disableDepthTestDistance:Number.POSITIVE_INFINITY});
+    const label=healthLabels.add({position,text:item.name,font:'600 11px Segoe UI, Arial',fillColor:C.Color.fromCssColorString('#552d51'),outlineColor:C.Color.WHITE,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,pixelOffset:new C.Cartesian2(0,-17),disableDepthTestDistance:Number.POSITIVE_INFINITY,show:false});
+    healthEntries.push({item,label});
+  }
+  refreshHealth(height());
+}
+function refreshHealth(h){
+  if(!healthPoints)return;
+  healthPoints.show=overlayState.health;
+  healthLabels.show=overlayState.health;
+  const used=[];let n=0;
+  for(const {item,label} of healthEntries){
+    label.show=false;
+    if(!overlayState.health||h>55000||n>=35)continue;
+    const p=C.SceneTransforms.worldToWindowCoordinates(viewer.scene,label.position);
+    if(!p||p.x<0||p.y<0||p.x>viewer.canvas.clientWidth||p.y>viewer.canvas.clientHeight)continue;
+    const w=Math.min(120,Math.max(35,item.name.length*3));
+    const r={l:p.x-w,r:p.x+w,t:p.y-35,b:p.y-12};
+    if(used.some(b=>r.l<b.r&&r.r>b.l&&r.t<b.b&&r.b>b.t))continue;
+    if(h<22000||item.kind==='ospedale'){label.show=true;used.push(r);n++;}
+  }
+}
+function showHealthPopup(item){
+  hidePopup();popupCoords=item.coords;popupBox.hidden=false;
+  const top=document.createElement('div');top.className='popupHead';
+  const title=document.createElement('h3');title.textContent=item.name;
+  const close=document.createElement('button');close.type='button';close.className='popupClose';close.textContent='×';close.setAttribute('aria-label','Chiudi informazioni');close.onclick=hidePopup;
+  top.append(title,close);popupBox.append(top);
+  const type=document.createElement('div');type.className='popupType';type.textContent=item.kind==='ospedale'?'OSPEDALE':'CLINICA / CENTRO DI CURA';popupBox.append(type);
+  const description=document.createElement('p');description.textContent=item.description;popupBox.append(description);
+  const note=document.createElement('p');note.className='roadPopupNote';note.textContent='Posizione cartografica indicativa; verificare indirizzo e servizi sul sito della struttura.';popupBox.append(note);
+  if(item.website){const link=document.createElement('a');link.href=item.website;link.target='_blank';link.rel='noopener noreferrer';link.className='healthWebsite';link.textContent='Apri sito ufficiale ↗';popupBox.append(link);}
+  positionPopup();viewer.scene.requestRender();
+}
 function makeRoads(){roadPrimitives=viewer.scene.primitives.add(new C.PolylineCollection());const lc=viewer.scene.primitives.add(new C.LabelCollection()),names=new Set();let count=0;
 for(const s of roads.segments){if(s.priority>3)continue;const color=C.Color.fromCssColorString(s.priority<=1?'#ab6e35':s.priority<=3?'#c08b57':'#dbb98a').withAlpha(.78);for(const coords of s.coords){if(coords.length<2)continue;roadPrimitives.add({positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:s.priority<=2?2.6:1.4,material:C.Material.fromType('Color',{color}),id:{romaRoadSegment:s.id}});count++;}
 if(s.name&&s.priority<=3&&!names.has(s.name)&&names.size<450&&s.coords[0]?.length>1){const line=s.coords[0],mid=line[Math.floor(line.length/2)];const label=lc.add({position:C.Cartesian3.fromDegrees(...mid),text:s.name,font:'600 11px Segoe UI, Arial',fillColor:C.Color.fromCssColorString('#915e32'),outlineColor:C.Color.WHITE,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,disableDepthTestDistance:Number.POSITIVE_INFINITY,show:false});roadLabels.push({label,priority:s.priority});names.add(s.name);}}
 $('mapStatus').textContent=`${districts.length} territori nei quiz · ${count.toLocaleString('it')} tratti OSM · ${roads.links.length} collegamenti`;}
 function river(){const coords=[[12.507,42.065],[12.500,42.043],[12.500,42.020],[12.503,41.998],[12.500,41.981],[12.491,41.966],[12.482,41.953],[12.478,41.944],[12.471,41.938],[12.463,41.933],[12.461,41.925],[12.470,41.920],[12.474,41.911],[12.467,41.904],[12.468,41.895],[12.479,41.889],[12.482,41.879],[12.478,41.870],[12.472,41.861],[12.467,41.849],[12.463,41.839],[12.455,41.828],[12.451,41.815],[12.438,41.801],[12.421,41.790],[12.410,41.780],[12.385,41.776],[12.369,41.764],[12.348,41.754],[12.326,41.742],[12.304,41.732],[12.281,41.724],[12.257,41.722]];viewer.entities.add({name:'Tevere (tracciato indicativo)',polyline:{positions:C.Cartesian3.fromDegreesArray(coords.flat()),width:7,material:C.Color.fromCssColorString('#4eb7e5').withAlpha(.55)}});}
-async function init(){try{const ds=await C.GeoJsonDataSource.load('js/districts.geojson',{stroke:C.Color.WHITE,fill:C.Color.fromCssColorString(colors.base),strokeWidth:1});viewer.dataSources.add(ds);for(const e of ds.entities.values){const id=e.properties?.roma_id?.getValue(C.JulianDate.now());if(Number.isInteger(id)&&e.polygon){if(!entities.has(id))entities.set(id,[]);entities.get(id).push(e);const hierarchy=e.polygon.hierarchy.getValue(C.JulianDate.now()),rect=C.Rectangle.fromCartesianArray(hierarchy.positions),center=C.Rectangle.center(rect);if(!districts[id].geoCenter)districts[id].geoCenter=[C.Math.toDegrees(center.longitude),C.Math.toDegrees(center.latitude)];}}if(entities.size!==districts.length)throw Error(`Geometrie: ${entities.size} di ${districts.length}`);recenterDistricts();makeLabels();makeRoads();makeTransit();river();started=true;change('learnQuartieri');fly(views.city);
+async function init(){try{const ds=await C.GeoJsonDataSource.load('js/districts.geojson',{stroke:C.Color.WHITE,fill:C.Color.fromCssColorString(colors.base),strokeWidth:1});viewer.dataSources.add(ds);for(const e of ds.entities.values){const id=e.properties?.roma_id?.getValue(C.JulianDate.now());if(Number.isInteger(id)&&e.polygon){if(!entities.has(id))entities.set(id,[]);entities.get(id).push(e);const hierarchy=e.polygon.hierarchy.getValue(C.JulianDate.now()),rect=C.Rectangle.fromCartesianArray(hierarchy.positions),center=C.Rectangle.center(rect);if(!districts[id].geoCenter)districts[id].geoCenter=[C.Math.toDegrees(center.longitude),C.Math.toDegrees(center.latitude)];}}if(entities.size!==districts.length)throw Error(`Geometrie: ${entities.size} di ${districts.length}`);recenterDistricts();makeLabels();makeRoads();makeTransit();makeHealth();river();started=true;change('learnQuartieri');fly(views.city);
 // In SCENE2D the filled district polygon often wins scene.pick over a thin road.
 // Search all picked primitives first, then use a screen-space tolerance for roads.
 const roadHitSegments=roads.segments.filter(s=>s.priority<=3&&groupBySegment.has(s.id));
@@ -233,6 +274,8 @@ const handler=new C.ScreenSpaceEventHandler(viewer.scene.canvas);
 handler.setInputAction(ev=>{
   const pickedAll=viewer.scene.drillPick(ev.position,25);
   const picked=pickedAll[0]||viewer.scene.pick(ev.position);
+  const healthHit=overlayState.health&&pickedAll.find(x=>x?.id?.romaHealthId);
+  if(healthHit){const facility=(window.ROMA_HEALTH||[]).find(x=>x.id===healthHit.id.romaHealthId);if(facility){showHealthPopup(facility);return;}}
   const station=pickedAll.find(x=>x?.id?.romaTransitStation);
   if(station){showTransitPopup(station.id.romaTransitStation);return;}
   if(overlayState.roads){

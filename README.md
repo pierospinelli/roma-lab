@@ -60,3 +60,10 @@ Con **Strade principali** attivo nel pannello Layer, il clic su un tratto OSM ev
 L'indice statico `js/road-index.js` e' calcolato offline e incluso nella pubblicazione GitHub/GitLab Pages. Lo script di sviluppo `build_road_index.py` nella cartella che contiene il progetto rigenera l'indice da `roads.js` e `districts.geojson` usando Python, Shapely, SciPy e PyProj (non necessari durante l'uso).
 
 **Precisazione sui dati:** le strade sono raggruppate per nome e prossimita' degli estremi (tolleranza 35 metri). La lunghezza e' la somma dei tratti OSM rappresentati, non necessariamente la lunghezza completa di tutta la strada e puo' conteggiare carreggiate parallele. I territori elencati sono quelli attraversati in maniera significativa dalle geometrie disponibili. La scheda e' disponibile solo per i segmenti visibili nel layer `Strade principali`.
+
+## v0.19 — Layer sanitario
+
+Nel pannello «Layer» è disponibile «Ospedali, cliniche e centri di cura».
+Sono compresi 21 grandi ospedali/cliniche di Roma con una prima descrizione, sito istituzionale o ufficiale e coordinate indicative in WGS84. Il layer è un catalogo didattico **non esaustivo** e non è utilizzabile per emergenze, navigazione verso gli ingressi o per accertare servizi e orari. Verificare informazioni, indirizzi, denominazioni e disponibilità sui siti delle strutture.
+
+I dati sono in `js/health.js`, caricati localmente anche su Pages. I collegamenti esterni ai siti delle strutture richiedono naturalmente una connessione Internet. Per correggere o ampliare il catalogo, modificare l'array `ROMA_HEALTH` con fonti e coordinate geografiche verificate e rieseguire `node prepare-pages.mjs`.
