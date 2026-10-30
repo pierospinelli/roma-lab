@@ -6,6 +6,8 @@ Gioco didattico completamente locale per conoscere i quartieri di Roma e le stra
 
 Installare Node.js 20 o successivo. Su Windows eseguire `avvia.bat`, su Linux/macOS `sh avvia.sh`. Aprire `http://localhost:6060`. Il server in ascolto su `127.0.0.1:6060` serve solamente file statici; non ci sono backend, database o servizi cloud.
 
+Su schermi fino a 700 px la pagina privilegia subito l'atlante: la barra con il titolo resta visibile e la mappa occupa la schermata iniziale. Il pulsante «Modalità» mostra le tre modalità disponibili; quando si sceglie un test, il relativo modulo compatto sostituisce temporaneamente ricerca e Layer. Il livello di conoscenza è accanto al titolo della mappa. Il layout desktop conserva il pannello laterale.
+
 ## Dati geografici
 
 Fonte ufficiale: Roma Capitale GeoServer WFS 1.0, layer `DIPAU:nuova_geografia_urbana_localita`, scaricato in WGS84 il 29 ottobre 2026 da `https://geoportale.comune.roma.it/geoserver/ows`.
