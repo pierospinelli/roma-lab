@@ -12,3 +12,11 @@
 .layerOption:has(input:disabled){opacity:.64;cursor:not-allowed}
 @media(max-width:900px){.mapHeaderControls{top:45px;right:26px}.layerPanel{top:86px;right:26px}.areaPicker{width:200px}}
 @media(max-width:600px){.mapHeaderControls{position:relative;top:auto;right:auto;justify-content:flex-end;margin:0 13px 9px}.areaPicker{width:calc(100% - 92px);max-width:none}.layerPanel{top:150px;right:13px}}
+
+/* Informazioni stradali */
+.areaPopup:has(.roadDistrictList){max-height:min(68vh,520px);overflow-y:auto;min-width:245px}
+.roadDistrictHeading{font-size:13px;margin:13px 0 7px;color:#28465b}
+.roadDistrictList{display:flex;flex-wrap:wrap;gap:5px;max-height:190px;overflow:auto}
+.roadDistrictList button{background:#edf4f7;color:#23516a;border:1px solid #c4d9e4;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+.roadDistrictList button:hover{background:#d7e9f1}
+.roadPopupNote{font-size:11px;color:#667f8b;line-height:1.4;margin-top:12px}

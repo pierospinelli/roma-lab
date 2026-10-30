@@ -52,3 +52,11 @@ Nelle modalità Learn, cliccando su una qualunque area geografica questa viene e
 `rebuild-road-links.py` richiede `shapely` in fase di sviluppo e aggiorna `js/roads.js` usando le polilinee OSM già estratte. `build-roads.py` richiede inoltre `osmium` e il file originale `.osm.pbf` per ricostruire tutte le strade. Questi strumenti **non servono per avviare Roma Lab**.
 
 I file `build-map.mjs` e i quattro `*-source.geojson` restano nel pacchetto per riprodurre, se necessario, la versione storica a 115 perimetri.
+
+## Roma Lab v0.18 — Schede stradali
+
+Con **Strade principali** attivo nel pannello Layer, il clic su un tratto OSM evidenzia in arancione il gruppo stradale connesso e apre una scheda con nome, lunghezza rilevata, numero di tratti e territori attraversati. I nomi dei territori sono cliccabili e portano alla relativa area.
+
+L'indice statico `js/road-index.js` e' calcolato offline e incluso nella pubblicazione GitHub/GitLab Pages. Lo script di sviluppo `build_road_index.py` nella cartella che contiene il progetto rigenera l'indice da `roads.js` e `districts.geojson` usando Python, Shapely, SciPy e PyProj (non necessari durante l'uso).
+
+**Precisazione sui dati:** le strade sono raggruppate per nome e prossimita' degli estremi (tolleranza 35 metri). La lunghezza e' la somma dei tratti OSM rappresentati, non necessariamente la lunghezza completa di tutta la strada e puo' conteggiare carreggiate parallele. I territori elencati sono quelli attraversati in maniera significativa dalle geometrie disponibili. La scheda e' disponibile solo per i segmenti visibili nel layer `Strade principali`.
