@@ -1,45 +1,13 @@
-/** Produce a self-contained static site for GitHub Pages and GitLab Pages.
- * Usage: node prepare-pages.mjs [output-directory]
- * The output does not need Node.js or a backend at runtime.
- */
-import { cp, mkdir, readdir, rm, stat, writeFile, readFile } from 'node:fs/promises';
-import { resolve, dirname, join, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const source = dirname(fileURLToPath(import.meta.url));
-const destination = resolve(source, process.argv[2] || 'public');
-const copied = ['index.html', 'css', 'js/cesium-app.js', 'js/data.js',
-  'js/districts.geojson', 'js/roads.js', 'js/transit.js', 'js/names.js', 'vendor/cesium'];
-if (destination === source || !destination.startsWith(source + sep)) {
-  throw Error('La directory di pubblicazione deve essere una sottodirectory del progetto.');
-}
-// Only replace the known generated output directory, never a source folder.
-if (!['public', 'dist'].includes(relative(source, destination))) {
-  throw Error('Directory di pubblicazione consentite: public oppure dist.');
-}
-try {
-  const marker = await readFile(join(destination, '.roma-lab-generated'), 'utf8');
-  if (marker !== 'Roma Lab: generated deployment folder\n') throw Error('Marker non valido.');
-} catch (err) {
-  if (err.code !== 'ENOENT') throw err;
-  try {
-    await stat(destination);
-    throw Error(`La cartella ${destination} esiste già e non è una distribuzione generata: non sarà sovrascritta.`);
-  } catch (check) {
-    if (check.code !== 'ENOENT') throw check;
-  }
-}
-await rm(destination, { recursive: true, force: true });
-await mkdir(destination, { recursive: true });
-for (const name of copied) {
-  const target = join(destination, name);
-  await mkdir(dirname(target), { recursive: true });
-  await cp(join(source, name), target, { recursive: true });
-}
-await writeFile(join(destination, '.nojekyll'), '');
-await writeFile(join(destination, '.roma-lab-generated'), 'Roma Lab: generated deployment folder\n');
-const files = await readdir(destination);
-if (!files.includes('index.html') || !(await stat(join(destination, 'index.html'))).size) {
-  throw Error('index.html mancante nella distribuzione.');
-}
-console.log(`Roma Lab: distribuzione statica pronta in ${destination}`);
+import {cp,mkdir,rm,writeFile,stat} from 'node:fs/promises';
+import {join,dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=dirname(fileURLToPath(import.meta.url));
+const dest=join(root,'public');
+await rm(dest,{recursive:true,force:true});
+await mkdir(dest,{recursive:true});
+const assets=['index.html','css','js/cesium-app.js','js/data.js','js/roads.js','js/transit.js','js/names.js','js/districts.geojson','vendor/cesium'];
+for(const item of assets){await mkdir(dirname(join(dest,item)),{recursive:true});await cp(join(root,item),join(dest,item),{recursive:true});}
+await writeFile(join(dest,'.nojekyll'),'');
+const required=['index.html','js/cesium-app.js','js/districts.geojson','vendor/cesium/Cesium.js','vendor/cesium/Workers','vendor/cesium/Assets','vendor/cesium/ThirdParty','vendor/cesium/Widgets/widgets.css'];
+for(const file of required){const st=await stat(join(dest,file));if(!st.size&&!st.isDirectory())throw Error('Risorsa vuota: '+file);}
+console.log('Roma Lab v0.17 pronta in public/');

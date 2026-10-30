@@ -1,4 +1,4 @@
-# Roma Lab v0.16 — CesiumJS 2D
+# Roma Lab v0.15 — CesiumJS 2D
 
 Gioco didattico completamente locale per conoscere i quartieri di Roma e le strade principali.
 
@@ -23,8 +23,6 @@ Le etichette dei quartieri sono spezzate su più righe quando contengono più pa
 Nella versione 0.14 il menu di sinistra non contiene più «Learn spostamenti»: le strade sono disponibili come layer opzionale in tutte le modalità. Il pulsante «Layer» è allineato alla testata «Roma e i suoi quartieri». Le 100 zone funzionali utilizzano una tinta lilla diversa dal verde salvia dei quartieri e rioni; selezione e risposte continuano a usare i colori del gioco.
 
 Nella versione 0.15 il menu contiene «01 Quartieri», «02 Test quartieri · dove» e «03 Test quartieri · nomi». La combo alla sinistra del pulsante «Layer» elenca alfabeticamente tutti i territori (anche quelli del livello massimo): selezionandone uno l'app passa alla modalità Quartieri, adegua il livello se necessario, evidenzia il poligono in giallo, apre il fumetto e ingrandisce la mappa sul suo perimetro geografico.
-
-La versione 0.16 aggiunge la pubblicazione statica su GitHub Pages e GitLab Pages: `node prepare-pages.mjs` produce la directory `public/`, mentre `.github/workflows/pages.yml` e `.gitlab-ci.yml` automatizzano la pubblicazione. Leggere [PUBBLICAZIONE.md](PUBBLICAZIONE.md) prima di caricare il repository.
 
 Il Tevere è ancora rappresentato con una polilinea geografica **indicativa**. Il fondo cartografico è neutro: non occorre scaricare tile da Internet. Asset, Workers e CSS di CesiumJS sono forniti in `vendor/cesium/` (licenza Apache-2.0). Rete stradale © OpenStreetMap contributors (ODbL).
 

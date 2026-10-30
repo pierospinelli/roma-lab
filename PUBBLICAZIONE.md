@@ -1,64 +1,33 @@
-# Pubblicazione Roma Lab su GitHub Pages o GitLab Pages
+# Roma Lab 0.17 — GitHub Pages e GitLab Pages
 
-Roma Lab è un sito statico: non richiede Node.js né backend **durante la navigazione**.
-Node.js è usato soltanto per generare i file di distribuzione, eventualmente in CI.
+Questa distribuzione parte **dalla versione 0.15**: menu con 3 modalità, combo 454 territori e pannello Layer.
 
-## Struttura
+## GitHub
 
-- `index.html`, `css/`, `js/`, `vendor/cesium/`: risorse dell'applicazione.
-- `prepare-pages.mjs`: prepara una cartella `public/` con le sole risorse necessarie.
-- `.github/workflows/pages.yml`: pubblicazione GitHub Pages a ogni push su `main`.
-- `.gitlab-ci.yml`: pubblicazione GitLab Pages sul branch predefinito.
-- `server.mjs`, `avvia.bat`, `avvia.sh`: modalità locale di sviluppo.
-- `build-*.py`, `build-*.mjs`, `*-source.geojson`: strumenti e input GIS usati in fase di preparazione, **non pubblicati**.
+1. Copiare nella **radice** del repository TUTTI i file e cartelle contenuti in `roma-lab/`, compresa la cartella NASCOSTA `.github/` (importante).
+2. Rimuovere eventuali copie obsolete come `docs/` se erano in uso.
+3. GitHub → Settings → Pages → Source: **GitHub Actions**.
+4. Eseguire `git add -A && git commit -m "Roma Lab 0.17" && git push`.
+5. Aprire Actions → workflow **Pubblica Roma Lab** → verificare deployment verde.
+6. Aprire `https://pierospinelli.github.io/roma-lab/` con refresh forzato (`Ctrl+F5`).
 
-## Verifica locale della distribuzione
+La pipeline genera `public/`: NON è necessario committarla, poiché viene ricreata ad ogni pubblicazione. Funziona anche per branch `master`.
 
-Da questa directory esegui:
+## Diagnosi mappa
 
-```bash
-node prepare-pages.mjs
-```
+Aprire DevTools (F12), schede Console e Network. Devono risultare HTTP 200:
 
-Si crea `public/`; apri questa cartella con un semplice server statico HTTPS/HTTP.
-Le librerie CesiumJS e tutti i dati geografici sono già all'interno.
-Puoi ancora avviare l'applicazione di sviluppo con `avvia.bat`/`avvia.sh`.
+- `https://pierospinelli.github.io/roma-lab/vendor/cesium/Cesium.js`
+- `https://pierospinelli.github.io/roma-lab/js/districts.geojson`
+- `https://pierospinelli.github.io/roma-lab/vendor/cesium/Workers/` (singoli script richiesti)
 
-## Pubblicazione GitHub Pages
+Se il vecchio menu ha 5 voci, è ancora pubblicata la versione precedente o è presente una cache.
+La riga `CESIUM_BASE_URL` è ora risolta dall'URL della pagina, per funzionare anche in sottodirectory.
 
-1. Crea un repository `roma-lab` su GitHub.
-2. Nella **radice del repository**, carica il contenuto della directory `roma-lab/` di questo archivio, **non** la directory contenitrice.
-3. Controlla che `.github/workflows/pages.yml` sia stato caricato: alcune operazioni di copia nascondono le directory che iniziano con un punto.
-4. Imposta il branch predefinito `main` (oppure adatta la voce `branches` nel workflow).
-5. Apri **Settings → Pages**, scegli come origine **GitHub Actions**.
-6. Esegui il push su `main` o avvia il workflow dalla scheda **Actions**.
+## GitLab
 
-Il sito sarà disponibile all'indirizzo `https://NOMEUTENTE.github.io/roma-lab/` (se il repository si chiama `roma-lab`).
-Il percorso `/roma-lab/` funziona senza cambiare i riferimenti: Cesium e GeoJSON usano URL relativi.
+La configurazione `.gitlab-ci.yml` genera `public/` da sorgenti.
 
-**Nota:** GitHub Pages è pubblicamente raggiungibile su Internet anche con alcune configurazioni di repository privato. Non pubblicare dati sensibili.
+## Locale
 
-## Pubblicazione GitLab Pages
-
-1. Crea un progetto GitLab `roma-lab`.
-2. Carica nella radice del repository il contenuto della directory `roma-lab/`.
-3. Verifica la presenza di `.gitlab-ci.yml` e che i runner GitLab siano abilitati.
-4. Esegui un push sul branch predefinito.
-5. La pipeline genera `public/` e pubblica il sito con `pages: true`.
-
-Il collegamento esatto compare nel progetto sotto **Deploy → Pages**.
-Su GitLab.com è normalmente `https://NOMEUTENTE.gitlab.io/roma-lab/`, salvo opzioni di dominio personalizzato o dominio univoco.
-
-## Come aggiornare il sito
-
-Per una nuova versione modifica i sorgenti e fai commit/push sul branch predefinito:
-la pipeline rigenera automaticamente `public/`. Non serve caricare manualmente la cartella.
-
-Per distribuire manualmente i file su un qualsiasi server statico usa invece `node prepare-pages.mjs` e copia **il contenuto** di `public/` nella directory servita dal web server.
-
-## Limiti e licenze
-
-- I dati geografici sono una fotografia della data di generazione: non si aggiornano automaticamente.
-- Attribuzione OpenStreetMap: mantenere il riferimento `© OpenStreetMap contributors` presente nell'interfaccia.
-- Verifica eventuali ulteriori obblighi di attribuzione dei dataset geografici originali prima di una pubblicazione pubblica.
-- La pubblicazione su Pages richiede normalmente HTTPS e connessione Internet per i visitatori; il bundle non chiama servizi esterni in esecuzione.
+`avvia.bat` oppure `node server.mjs`; aprire http://localhost:6060.

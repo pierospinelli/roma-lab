@@ -1,12 +1,10 @@
-image: node:20-alpine
-
-stages:
-  - deploy
-
-create-pages:
+image: node:20
+pages:
   stage: deploy
   script:
     - node prepare-pages.mjs
-  pages: true
+  artifacts:
+    paths:
+      - public
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
